@@ -1,8 +1,9 @@
 [
     {
         "name": "XTB",
-        "quantity": 50.0,
-        "buy_price": 5000.0,
-        "current_price": 3000.0
+        "ticker": "BTC-USD",
+        "quantity": 15.0,
+        "buy_price": 300.0,
+        "current_price": 118688.40625
     }
 ]

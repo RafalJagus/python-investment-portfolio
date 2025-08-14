@@ -1,56 +1,70 @@
 import json
 import os
+import yfinance as yf  # biblioteka do pobierania danych rynkowych
 
-# ──> Zapisuj plik obok skryptu (bezpieczniej)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # katalog, w którym jest ten plik .py
+# Ścieżka do pliku z portfelem
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FILENAME = os.path.join(BASE_DIR, "portfolio.json")
 
 def load_portfolio():
-    """Wczytuje portfel z JSON; obsługuje pusty/uszkodzony plik i pierwszy start."""
+    """Wczytuje portfel z JSON; obsługuje pusty/uszkodzony plik."""
     if not os.path.exists(FILENAME):
         return []
     try:
         with open(FILENAME, "r", encoding="utf-8") as f:
             text = f.read().strip()
             if not text:
-                # pusty plik – traktujemy jak brak danych
                 return []
             return json.loads(text)
     except json.JSONDecodeError:
-        # plik istnieje, ale ma zły format – nie blokujemy działania aplikacji
-        print("⚠️  portfolio.json jest pusty lub ma błędny format. Inicjalizuję pusty portfel.")
+        print("⚠️  portfolio.json ma błędny format – inicjalizuję pusty portfel.")
         return []
+
 def save_portfolio(portfolio):
-    """Zapisuje dane portfela do pliku JSON"""
+    """Zapisuje portfel do pliku JSON."""
     with open(FILENAME, "w", encoding="utf-8") as f:
         json.dump(portfolio, f, indent=4, ensure_ascii=False)
+        f.write("\n")
 
 def add_investment(portfolio):
-    """Dodaje nową inwestycję do portfela"""
+    """Dodaje inwestycję do portfela."""
     name = input("Podaj nazwę aktywa: ")
+    ticker = input("Podaj ticker (np. AAPL, MSFT, BTC-USD): ").upper()
     quantity = float(input("Podaj ilość jednostek: "))
     buy_price = float(input("Podaj cenę zakupu za jednostkę: "))
     portfolio.append({
         "name": name,
+        "ticker": ticker,
         "quantity": quantity,
         "buy_price": buy_price,
         "current_price": buy_price
     })
-    print("✅ Inwestycja została dodana.")
+    print("✅ Inwestycja dodana.")
+
+def fetch_price(ticker):
+    """Pobiera aktualną cenę z Yahoo Finance."""
+    try:
+        data = yf.Ticker(ticker)
+        price = data.history(period="1d")["Close"].iloc[-1]
+        return float(price)
+    except Exception as e:
+        print(f"⚠️ Nie udało się pobrać ceny dla {ticker}: {e}")
+        return None
 
 def update_price(portfolio):
-    """Aktualizuje bieżącą cenę rynkową dla wybranego aktywa"""
-    name = input("Podaj nazwę aktywa do aktualizacji: ")
+    """Aktualizuje cenę rynkową z API Yahoo Finance."""
+    ticker = input("Podaj ticker do aktualizacji: ").upper()
     for investment in portfolio:
-        if investment["name"].lower() == name.lower():
-            new_price = float(input("Podaj nową cenę rynkową: "))
-            investment["current_price"] = new_price
-            print("📈 Cena została zaktualizowana.")
+        if investment.get("ticker", "").upper() == ticker:
+            price = fetch_price(ticker)
+            if price:
+                investment["current_price"] = price
+                print(f"📈 Cena {ticker} zaktualizowana: {price:.2f} USD")
             return
-    print("⚠️ Nie znaleziono takiego aktywa.")
+    print("⚠️ Nie znaleziono aktywa o podanym tickerze w portfelu.")
 
 def show_portfolio(portfolio):
-    """Wyświetla wszystkie inwestycje w portfelu wraz z zyskiem/stratą"""
+    """Wyświetla portfel inwestycyjny."""
     if not portfolio:
         print("📂 Portfel jest pusty.")
         return
@@ -61,19 +75,19 @@ def show_portfolio(portfolio):
         profit = value - (investment["quantity"] * investment["buy_price"])
         percent = (profit / (investment["quantity"] * investment["buy_price"])) * 100
         total_value += value
-        print(f"{investment['name']}: {investment['quantity']} szt. "
+        print(f"{investment['name']} ({investment.get('ticker','-')}): {investment['quantity']} szt. "
               f"kupione po {investment['buy_price']} USD, "
-              f"teraz {investment['current_price']} USD "
+              f"teraz {investment['current_price']:.2f} USD "
               f"(Zysk/Strata: {profit:.2f} USD / {percent:.2f}%)")
     print(f"💰 Wartość całkowita portfela: {total_value:.2f} USD")
 
 def main():
-    """Główna pętla programu"""
+    """Główna pętla programu."""
     portfolio = load_portfolio()
     while True:
         print("\n=== Aplikacja Portfel Inwestycyjny ===")
         print("1. Dodaj inwestycję")
-        print("2. Aktualizuj cenę")
+        print("2. Aktualizuj cenę z API")
         print("3. Pokaż portfel")
         print("4. Wyjście")
         choice = input("Wybierz opcję: ")
