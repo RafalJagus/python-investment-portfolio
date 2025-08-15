@@ -1,13 +1,14 @@
 import json
 import os
-import yfinance as yf  # biblioteka do pobierania danych rynkowych
+import yfinance as yf
+import tkinter as tk
+from tkinter import simpledialog, messagebox, ttk
 
-# Ścieżka do pliku z portfelem
+# Ścieżka do pliku
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FILENAME = os.path.join(BASE_DIR, "portfolio.json")
 
 def load_portfolio():
-    """Wczytuje portfel z JSON; obsługuje pusty/uszkodzony plik."""
     if not os.path.exists(FILENAME):
         return []
     try:
@@ -17,94 +18,103 @@ def load_portfolio():
                 return []
             return json.loads(text)
     except json.JSONDecodeError:
-        print("⚠️  portfolio.json ma błędny format – inicjalizuję pusty portfel.")
+        messagebox.showwarning("Warning", "portfolio.json is corrupted. Starting empty.")
         return []
 
 def save_portfolio(portfolio):
-    """Zapisuje portfel do pliku JSON."""
     with open(FILENAME, "w", encoding="utf-8") as f:
         json.dump(portfolio, f, indent=4, ensure_ascii=False)
-        f.write("\n")
-
-def add_investment(portfolio):
-    """Dodaje inwestycję do portfela."""
-    name = input("Podaj nazwę aktywa: ")
-    ticker = input("Podaj ticker (np. AAPL, MSFT, BTC-USD): ").upper()
-    quantity = float(input("Podaj ilość jednostek: "))
-    buy_price = float(input("Podaj cenę zakupu za jednostkę: "))
-    portfolio.append({
-        "name": name,
-        "ticker": ticker,
-        "quantity": quantity,
-        "buy_price": buy_price,
-        "current_price": buy_price
-    })
-    print("✅ Inwestycja dodana.")
 
 def fetch_price(ticker):
-    """Pobiera aktualną cenę z Yahoo Finance."""
     try:
         data = yf.Ticker(ticker)
         price = data.history(period="1d")["Close"].iloc[-1]
         return float(price)
     except Exception as e:
-        print(f"⚠️ Nie udało się pobrać ceny dla {ticker}: {e}")
+        messagebox.showerror("Error", f"Could not fetch price for {ticker}: {e}")
         return None
 
-def update_price(portfolio):
-    """Aktualizuje cenę rynkową z API Yahoo Finance."""
-    ticker = input("Podaj ticker do aktualizacji: ").upper()
-    for investment in portfolio:
-        if investment.get("ticker", "").upper() == ticker:
+def add_investment():
+    name = simpledialog.askstring("Add Investment", "Asset name:")
+    ticker = simpledialog.askstring("Add Investment", "Ticker (e.g., AAPL, MSFT, BTC-USD):")
+    quantity = simpledialog.askfloat("Add Investment", "Quantity:")
+    buy_price = simpledialog.askfloat("Add Investment", "Buy price per unit:")
+    if name and ticker and quantity and buy_price:
+        portfolio.append({
+            "name": name,
+            "ticker": ticker.upper(),
+            "quantity": quantity,
+            "buy_price": buy_price,
+            "current_price": buy_price
+        })
+        save_portfolio(portfolio)
+        refresh_table()
+
+def update_price():
+    ticker = simpledialog.askstring("Update Price", "Enter ticker to update:")
+    if not ticker:
+        return
+    ticker = ticker.upper()
+    for inv in portfolio:
+        if inv["ticker"] == ticker:
             price = fetch_price(ticker)
             if price:
-                investment["current_price"] = price
-                print(f"📈 Cena {ticker} zaktualizowana: {price:.2f} USD")
+                inv["current_price"] = price
+                save_portfolio(portfolio)
+                refresh_table()
+                messagebox.showinfo("Updated", f"Price for {ticker} updated to {price:.2f} USD")
             return
-    print("⚠️ Nie znaleziono aktywa o podanym tickerze w portfelu.")
+    messagebox.showwarning("Not found", f"No investment with ticker {ticker} found.")
 
-def show_portfolio(portfolio):
-    """Wyświetla portfel inwestycyjny."""
-    if not portfolio:
-        print("📂 Portfel jest pusty.")
-        return
+def refresh_table():
+    for row in tree.get_children():
+        tree.delete(row)
     total_value = 0
-    print("\n--- Twój portfel ---")
-    for investment in portfolio:
-        value = investment["quantity"] * investment["current_price"]
-        profit = value - (investment["quantity"] * investment["buy_price"])
-        percent = (profit / (investment["quantity"] * investment["buy_price"])) * 100
+    for inv in portfolio:
+        value = inv["quantity"] * inv["current_price"]
+        profit = value - (inv["quantity"] * inv["buy_price"])
+        percent = (profit / (inv["quantity"] * inv["buy_price"])) * 100
         total_value += value
-        print(f"{investment['name']} ({investment.get('ticker','-')}): {investment['quantity']} szt. "
-              f"kupione po {investment['buy_price']} USD, "
-              f"teraz {investment['current_price']:.2f} USD "
-              f"(Zysk/Strata: {profit:.2f} USD / {percent:.2f}%)")
-    print(f"💰 Wartość całkowita portfela: {total_value:.2f} USD")
+        tree.insert("", "end", values=(
+            inv["name"],
+            inv["ticker"],
+            inv["quantity"],
+            f"{inv['buy_price']:.2f}",
+            f"{inv['current_price']:.2f}",
+            f"{profit:.2f} USD",
+            f"{percent:.2f}%",
+            f"{value:.2f} USD"
+        ))
+    total_label.config(text=f"💰 Total Portfolio Value: {total_value:.2f} USD")
 
-def main():
-    """Główna pętla programu."""
-    portfolio = load_portfolio()
-    while True:
-        print("\n=== Aplikacja Portfel Inwestycyjny ===")
-        print("1. Dodaj inwestycję")
-        print("2. Aktualizuj cenę z API")
-        print("3. Pokaż portfel")
-        print("4. Wyjście")
-        choice = input("Wybierz opcję: ")
-        if choice == "1":
-            add_investment(portfolio)
-            save_portfolio(portfolio)
-        elif choice == "2":
-            update_price(portfolio)
-            save_portfolio(portfolio)
-        elif choice == "3":
-            show_portfolio(portfolio)
-        elif choice == "4":
-            save_portfolio(portfolio)
-            print("👋 Do zobaczenia!")
-            break
-        else:
-            print("⚠️ Nieprawidłowy wybór.")
+# --- MAIN ---
+portfolio = load_portfolio()
 
-if __name__ == "__main__":
-    main()
+root = tk.Tk()
+root.title("Investment Portfolio Manager")
+root.geometry("900x400")
+
+frame = tk.Frame(root)
+frame.pack(pady=10)
+
+tree = ttk.Treeview(frame, columns=(
+    "Name", "Ticker", "Quantity", "Buy Price", "Current Price", "Profit", "Change %", "Value"
+), show="headings")
+for col in tree["columns"]:
+    tree.heading(col, text=col)
+    tree.column(col, width=100)
+tree.pack()
+
+btn_frame = tk.Frame(root)
+btn_frame.pack(pady=10)
+
+tk.Button(btn_frame, text="Add Investment", command=add_investment).grid(row=0, column=0, padx=5)
+tk.Button(btn_frame, text="Update Price (API)", command=update_price).grid(row=0, column=1, padx=5)
+tk.Button(btn_frame, text="Exit", command=root.quit).grid(row=0, column=2, padx=5)
+
+total_label = tk.Label(root, text="💰 Total Portfolio Value: 0.00 USD", font=("Arial", 14))
+total_label.pack(pady=10)
+
+refresh_table()
+
+root.mainloop()
