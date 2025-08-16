@@ -3,11 +3,13 @@ import os
 import yfinance as yf
 import tkinter as tk
 from tkinter import simpledialog, messagebox, ttk
+from datetime import datetime
 
-# Ścieżka do pliku
+# --- PATH ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FILENAME = os.path.join(BASE_DIR, "portfolio.json")
 
+# --- DATA HANDLING ---
 def load_portfolio():
     if not os.path.exists(FILENAME):
         return []
@@ -34,6 +36,7 @@ def fetch_price(ticker):
         messagebox.showerror("Error", f"Could not fetch price for {ticker}: {e}")
         return None
 
+# --- GUI FUNCTIONS ---
 def add_investment():
     name = simpledialog.askstring("Add Investment", "Asset name:")
     ticker = simpledialog.askstring("Add Investment", "Ticker (e.g., AAPL, MSFT, BTC-USD):")
@@ -48,23 +51,20 @@ def add_investment():
             "current_price": buy_price
         })
         save_portfolio(portfolio)
-        refresh_table()
+        refresh_prices()  # automatycznie odśwież po dodaniu
 
-def update_price():
-    ticker = simpledialog.askstring("Update Price", "Enter ticker to update:")
-    if not ticker:
-        return
-    ticker = ticker.upper()
+def refresh_prices():
+    """Update all prices from Yahoo Finance API"""
+    updated_any = False
     for inv in portfolio:
-        if inv["ticker"] == ticker:
-            price = fetch_price(ticker)
-            if price:
-                inv["current_price"] = price
-                save_portfolio(portfolio)
-                refresh_table()
-                messagebox.showinfo("Updated", f"Price for {ticker} updated to {price:.2f} USD")
-            return
-    messagebox.showwarning("Not found", f"No investment with ticker {ticker} found.")
+        price = fetch_price(inv["ticker"])
+        if price:
+            inv["current_price"] = price
+            updated_any = True
+    if updated_any:
+        save_portfolio(portfolio)
+        refresh_table()
+        update_timestamp()
 
 def refresh_table():
     for row in tree.get_children():
@@ -87,12 +87,16 @@ def refresh_table():
         ))
     total_label.config(text=f"💰 Total Portfolio Value: {total_value:.2f} USD")
 
+def update_timestamp():
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    last_update_label.config(text=f"Last update: {now}")
+
 # --- MAIN ---
 portfolio = load_portfolio()
 
 root = tk.Tk()
 root.title("Investment Portfolio Manager")
-root.geometry("900x400")
+root.geometry("950x450")
 
 frame = tk.Frame(root)
 frame.pack(pady=10)
@@ -109,12 +113,16 @@ btn_frame = tk.Frame(root)
 btn_frame.pack(pady=10)
 
 tk.Button(btn_frame, text="Add Investment", command=add_investment).grid(row=0, column=0, padx=5)
-tk.Button(btn_frame, text="Update Price (API)", command=update_price).grid(row=0, column=1, padx=5)
+tk.Button(btn_frame, text="Refresh Prices (API)", command=refresh_prices).grid(row=0, column=1, padx=5)
 tk.Button(btn_frame, text="Exit", command=root.quit).grid(row=0, column=2, padx=5)
 
 total_label = tk.Label(root, text="💰 Total Portfolio Value: 0.00 USD", font=("Arial", 14))
-total_label.pack(pady=10)
+total_label.pack(pady=5)
 
-refresh_table()
+last_update_label = tk.Label(root, text="Last update: -", font=("Arial", 10), fg="gray")
+last_update_label.pack(pady=5)
+
+# Initial refresh on startup
+refresh_prices()
 
 root.mainloop()
