@@ -51,10 +51,9 @@ def add_investment():
             "current_price": buy_price
         })
         save_portfolio(portfolio)
-        refresh_prices()  # automatycznie odśwież po dodaniu
+        refresh_prices()
 
 def refresh_prices():
-    """Update all prices from Yahoo Finance API"""
     updated_any = False
     for inv in portfolio:
         price = fetch_price(inv["ticker"])
@@ -95,10 +94,44 @@ def update_timestamp():
 portfolio = load_portfolio()
 
 root = tk.Tk()
-root.title("Investment Portfolio Manager")
+root.title("Investment Portfolio Manager (Dark Mode)")
 root.geometry("950x450")
+root.configure(bg="#1e1e1e")  # dark background
 
-frame = tk.Frame(root)
+# --- STYLES ---
+style = ttk.Style()
+style.theme_use("default")
+
+style.configure("Treeview",
+    background="#2d2d2d",
+    foreground="white",
+    fieldbackground="#2d2d2d",
+    rowheight=25,
+    bordercolor="#1e1e1e",
+    borderwidth=0
+)
+style.configure("Treeview.Heading",
+    background="#1e1e1e",
+    foreground="white"
+)
+style.map("Treeview",
+    background=[("selected", "#4a90e2")],
+    foreground=[("selected", "white")]
+)
+
+button_style = {
+    "bg": "#2d2d2d",
+    "fg": "#ffffff",
+    "activebackground": "#3e3e3e",
+    "activeforeground": "#ffffff",
+    "relief": "flat",
+    "width": 20,
+    "padx": 5,
+    "pady": 5
+}
+
+# --- GUI ---
+frame = tk.Frame(root, bg="#1e1e1e")
 frame.pack(pady=10)
 
 tree = ttk.Treeview(frame, columns=(
@@ -109,17 +142,19 @@ for col in tree["columns"]:
     tree.column(col, width=100)
 tree.pack()
 
-btn_frame = tk.Frame(root)
+btn_frame = tk.Frame(root, bg="#1e1e1e")
 btn_frame.pack(pady=10)
 
-tk.Button(btn_frame, text="Add Investment", command=add_investment).grid(row=0, column=0, padx=5)
-tk.Button(btn_frame, text="Refresh Prices (API)", command=refresh_prices).grid(row=0, column=1, padx=5)
-tk.Button(btn_frame, text="Exit", command=root.quit).grid(row=0, column=2, padx=5)
+tk.Button(btn_frame, text="Add Investment", command=add_investment, **button_style).grid(row=0, column=0, padx=5)
+tk.Button(btn_frame, text="Refresh Prices (API)", command=refresh_prices, **button_style).grid(row=0, column=1, padx=5)
+tk.Button(btn_frame, text="Exit", command=root.quit, **button_style).grid(row=0, column=2, padx=5)
 
-total_label = tk.Label(root, text="💰 Total Portfolio Value: 0.00 USD", font=("Arial", 14))
+total_label = tk.Label(root, text="💰 Total Portfolio Value: 0.00 USD",
+                       font=("Arial", 14), bg="#1e1e1e", fg="white")
 total_label.pack(pady=5)
 
-last_update_label = tk.Label(root, text="Last update: -", font=("Arial", 10), fg="gray")
+last_update_label = tk.Label(root, text="Last update: -",
+                             font=("Arial", 10), fg="gray", bg="#1e1e1e")
 last_update_label.pack(pady=5)
 
 # Initial refresh on startup
